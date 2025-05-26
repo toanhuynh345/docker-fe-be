@@ -1,0 +1,98 @@
+version: '3.8' # Phiên bản Docker Compose được sử dụng
+
+services: # Định nghĩa các dịch vụ (containers)
+  # Backend Service (NestJS) # Comment mô tả dịch vụ backend
+  backend: # Tên dịch vụ backend
+    build: # Cấu hình build image
+      context: ../backend # Thư mục chứa source code backend
+      dockerfile: Dockerfile # Tên file Dockerfile
+      target: production # Target stage trong multi-stage build
+    container_name: demo-backend # Tên container khi chạy
+    ports: # Mapping port từ host vào container
+      - "3001:3001" # Port 3001 của host -> port 3001 của container
+    environment: # Biến môi trường cho container
+      - NODE_ENV=production # Chế độ production
+      - PORT=3001 # Port mà ứng dụng sẽ lắng nghe
+    networks: # Mạng mà container tham gia
+      - app-network # Tên mạng được định nghĩa bên dưới
+    restart: unless-stopped # Tự động restart container trừ khi bị stop thủ công
+    healthcheck: # Kiểm tra sức khỏe container
+      test: ["CMD", "node", "--version"] # Lệnh kiểm tra (chạy node --version)
+      interval: 30s # Kiểm tra mỗi 30 giây
+      timeout: 10s # Timeout cho mỗi lần kiểm tra
+      retries: 3 # Số lần thử lại nếu fail
+      start_period: 10s # Thời gian chờ trước khi bắt đầu kiểm tra
+
+  # Frontend Service (Next.js) # Comment mô tả dịch vụ frontend
+  frontend: # Tên dịch vụ frontend
+    build: # Cấu hình build image
+      context: ../frontend # Thư mục chứa source code frontend
+      dockerfile: Dockerfile # Tên file Dockerfile
+      target: runner # Target stage trong multi-stage build
+    container_name: demo-frontend # Tên container khi chạy
+    ports: # Mapping port từ host vào container
+      - "3000:3000" # Port 3000 của host -> port 3000 của container
+    environment: # Biến môi trường cho container
+      - NODE_ENV=production # Chế độ production
+      - NEXT_TELEMETRY_DISABLED=1 # Tắt telemetry của Next.js
+      - PORT=3000 # Port mà ứng dụng sẽ lắng nghe
+      - HOSTNAME=0.0.0.0 # Cho phép kết nối từ mọi IP
+    networks: # Mạng mà container tham gia
+      - app-network # Tên mạng được định nghĩa bên dưới
+    depends_on: # Phụ thuộc vào dịch vụ khác
+      backend: # Phụ thuộc vào dịch vụ backend
+        condition: service_healthy # Chờ backend healthy mới start
+    restart: unless-stopped # Tự động restart container trừ khi bị stop thủ công
+    healthcheck: # Kiểm tra sức khỏe container
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"] # Kiểm tra bằng wget
+      interval: 30s # Kiểm tra mỗi 30 giây
+      timeout: 10s # Timeout cho mỗi lần kiểm tra
+      retries: 3 # Số lần thử lại nếu fail
+      start_period: 10s # Thời gian chờ trước khi bắt đầu kiểm tra
+
+# Development override (optional) # Comment về phần cấu hình development
+  # Uncomment the services below for development mode # Bỏ comment các dịch vụ bên dưới để chạy ở chế độ development
+  # backend-dev: # Dịch vụ backend cho development
+  #   build: # Cấu hình build
+  #     context: ../backend # Thư mục source code
+  #     dockerfile: Dockerfile # File Dockerfile
+  #     target: development # Target development trong multi-stage build
+  #   container_name: demo-backend-dev # Tên container development
+  #   ports: # Mapping port
+  #     - "3001:3001" # Port mapping
+  #   volumes: # Mount volumes để sync code
+  #     - ../backend:/app # Mount source code vào container
+  #     - /app/node_modules # Exclude node_modules khỏi mount
+  #   environment: # Biến môi trường
+  #     - NODE_ENV=development # Chế độ development
+  #   networks: # Mạng
+  #     - app-network # Tham gia mạng app-network
+  #   command: npm run start:dev # Lệnh chạy ở chế độ development
+
+  # frontend-dev: # Dịch vụ frontend cho development
+  #   build: # Cấu hình build
+  #     context: ../frontend # Thư mục source code
+  #     dockerfile: Dockerfile # File Dockerfile
+  #     target: deps # Target deps trong multi-stage build
+  #   container_name: demo-frontend-dev # Tên container development
+  #   ports: # Mapping port
+  #     - "3000:3000" # Port mapping
+  #   volumes: # Mount volumes để sync code
+  #     - ../frontend:/app # Mount source code vào container
+  #     - /app/node_modules # Exclude node_modules khỏi mount
+  #     - /app/.next # Exclude .next folder khỏi mount
+  #   environment: # Biến môi trường
+  #     - NODE_ENV=development # Chế độ development
+  #   networks: # Mạng
+  #     - app-network # Tham gia mạng app-network
+  #   command: npm run dev # Lệnh chạy development server
+
+networks: # Định nghĩa các mạng
+  app-network: # Tên mạng
+    driver: bridge # Loại driver mạng (bridge là default)
+    name: demo-app-network # Tên mạng thực tế trong Docker
+
+# Optional: Add volumes for persistent data # Comment về volumes tùy chọn
+# volumes: # Định nghĩa volumes để lưu trữ dữ liệu persistent
+#   backend-data: # Volume cho backend data
+#   frontend-data: # Volume cho frontend data
